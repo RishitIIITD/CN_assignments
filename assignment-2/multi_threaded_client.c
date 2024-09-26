@@ -1,81 +1,83 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
-
-// inet_addr
-#include <arpa/inet.h>
 #include <unistd.h>
-
-// For threading, link with lpthread
+#include <arpa/inet.h>
 #include <pthread.h>
 
-// Function to send data to the server socket
-void* clienthread(void* args)
-{
-    int client_request = *((int*)args);
-    int network_socket;
+#define PORT 8989
+#define BUFFER_SIZE 1024
 
-    // Create a stream socket
-    network_socket = socket(AF_INET, SOCK_STREAM, 0);
+// Function to handle client tasks
+void* client_task(void* arg) {
+    int sock = 0;
+    struct sockaddr_in serv_addr;
+    const char *hello = "Hello from client";
+    char buffer[BUFFER_SIZE] = {0};
 
-    // Initialize port number and address
-    struct sockaddr_in server_address;
-    server_address.sin_family = AF_INET;
-    server_address.sin_addr.s_addr = INADDR_ANY;
-    server_address.sin_port = htons(8989);
+    pthread_t this_id = pthread_self();
 
-    // Initiate a socket connection
-    int connection_status = connect(network_socket,
-                                    (struct sockaddr*)&server_address,
-                                    sizeof(server_address));
-
-    // Check for connection error
-    if (connection_status < 0) {
-        puts("Error\n");
-        return 0;
+    // Create socket
+    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        fprintf(stderr, "Thread %lu: Socket creation error\n", (unsigned long)this_id);
+        return NULL;
     }
 
-    printf("Connection established by client thread\n");
+    // Prepare the server address
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(PORT);
 
-    // Send data to the socket (example value 1)
-    send(network_socket, &client_request, sizeof(client_request), 0);
+    // Convert IPv4 address from text to binary
+    if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0) {
+        fprintf(stderr, "Thread %lu: Invalid address/Address not supported\n", (unsigned long)this_id);
+        close(sock);
+        return NULL;
+    }
 
-    // Close the connection
-    close(network_socket);
-    pthread_exit(NULL);
+    // Connect to the server
+    if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+        fprintf(stderr, "Thread %lu: Connection Failed\n", (unsigned long)this_id);
+        close(sock);
+        return NULL;
+    }
 
-    return 0;
+    // Send message to the server
+    send(sock, hello, strlen(hello), 0);
+    printf("Thread %lu: Hello message sent\n", (unsigned long)this_id);
+
+    // Read response from the server
+    read(sock, buffer, BUFFER_SIZE);
+    printf("Thread %lu: Message received: %s\n", (unsigned long)this_id, buffer);
+
+    // Close the socket
+    close(sock);
+    return NULL;
 }
 
 // Driver Code
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     if (argc != 2) {
-        printf("Usage: %s <number_of_clients>\n", argv[0]);
-        exit(1);
+        fprintf(stderr, "Usage: %s <number_of_clients>\n", argv[0]);
+        return EXIT_FAILURE;
     }
 
     int num_clients = atoi(argv[1]);
-    pthread_t tid[num_clients];
+    pthread_t *threads = malloc(num_clients * sizeof(pthread_t));
 
-    // Create connection for each client
+    // Create threads for concurrent client connections
     for (int i = 0; i < num_clients; i++) {
-        int client_request = 1;  // Example data to send
-
-        // Create thread for each client connection
-        if (pthread_create(&tid[i], NULL, clienthread, &client_request) != 0) {
-            printf("Failed to create thread for client %d\n", i + 1);
+        if (pthread_create(&threads[i], NULL, client_task, NULL) != 0) {
+            fprintf(stderr, "Failed to create thread %d\n", i + 1);
+            free(threads);
+            return EXIT_FAILURE;
         }
     }
 
-    printf("All %d client connections have been initiated.\n", num_clients);
-
-    // Infinite loop to keep the client process running
-    while (1) {
-        // This loop ensures the process remains active until terminated with Ctrl-C
-        sleep(1);
+    // Wait for all threads to finish
+    for (int i = 0; i < num_clients; i++) {
+        pthread_join(threads[i], NULL);
     }
 
-    return 0;
+    free(threads);
+    return EXIT_SUCCESS;
 }

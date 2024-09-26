@@ -1,154 +1,100 @@
-#include <arpa/inet.h>
-
-// For threading, link with lpthread
-#include <pthread.h>
-#include <semaphore.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
 #include <unistd.h>
+#include <pthread.h>
 
-// Semaphore variables
-sem_t x, y;
-pthread_t tid;
-pthread_t writerthreads[100];
-pthread_t readerthreads[100];
-int readercount = 0;
+#define PORT 8989
+#define MAX_CLIENTS 50
 
-// Reader Function
-void* reader(void* param)
-{
-	// Lock the semaphore
-	sem_wait(&x);
-	readercount++;
+// Structure to hold client information
+typedef struct {
+    int socket;
+    struct sockaddr_in address;
+} client_info;
 
-	if (readercount == 1)
-		sem_wait(&y);
+// Function to handle client connections
+void* handle_client(void* args) {
+    client_info* client = (client_info*)args;
+    int client_socket = client->socket;
+    char buffer[1024];
 
-	// Unlock the semaphore
-	sem_post(&x);
+    // Inform that a new client has connected
+    printf("Client connected: %s:%d\n", inet_ntoa(client->address.sin_addr), ntohs(client->address.sin_port));
 
-	printf("\n%d reader is inside", readercount);
+    // Receiving data from the client
+    recv(client_socket, buffer, sizeof(buffer), 0);
+    printf("Received data: %s\n", buffer);
 
-	sleep(5);
-
-	// Lock the semaphore
-	sem_wait(&x);
-	readercount--;
-
-	if (readercount == 0) {
-		sem_post(&y);
-	}
-
-	// Unlock the semaphore
-	sem_post(&x);
-
-	printf("\n%d Reader is leaving", readercount + 1);
-	pthread_exit(NULL);
-}
-
-// Writer Function
-void* writer(void* param)
-{
-	printf("\nWriter is trying to enter");
-
-	// Lock the semaphore
-	sem_wait(&y);
-
-	printf("\nWriter has entered");
-
-	// Unlock the semaphore
-	sem_post(&y);
-
-	printf("\nWriter is leaving");
-	pthread_exit(NULL);
+    // Close the client socket after handling
+    close(client_socket);
+    free(client);  // Free the allocated memory for client info
+    pthread_exit(NULL);
 }
 
 // Driver Code
-int main()
-{
-	// Initialize variables
-	int serverSocket, newSocket;
-	struct sockaddr_in serverAddr;
-	struct sockaddr_storage serverStorage;
+int main() {
+    int server_socket, new_socket;
+    struct sockaddr_in server_address, client_address;
+    socklen_t client_len = sizeof(client_address);
+    pthread_t thread_id;
 
-	socklen_t addr_size;
-	sem_init(&x, 0, 1);
-	sem_init(&y, 0, 1);
+    // Create a TCP socket
+    server_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_socket == -1) {
+        perror("Failed to create socket");
+        exit(EXIT_FAILURE);
+    }
 
-	serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-	serverAddr.sin_addr.s_addr = INADDR_ANY;
-	serverAddr.sin_family = AF_INET;
-	serverAddr.sin_port = htons(8989);
+    // Prepare the server address structure
+    server_address.sin_family = AF_INET;
+    server_address.sin_addr.s_addr = INADDR_ANY;
+    server_address.sin_port = htons(PORT);
 
-	// Bind the socket to the address and port number.
-	if (bind(serverSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) {
-		printf("Bind failed\n");
-		return -1;
-	}
+    // Bind the socket to the address and port
+    if (bind(server_socket, (struct sockaddr*)&server_address, sizeof(server_address)) < 0) {
+        perror("Failed to bind socket");
+        close(server_socket);
+        exit(EXIT_FAILURE);
+    }
 
-	// Listen on the socket, with 50 max connection requests queued
-	if (listen(serverSocket, 50) == 0)
-		printf("Server is listening\n");
-	else {
-		printf("Error in listening\n");
-		return -1;
-	}
+    // Listen for incoming connections
+    if (listen(server_socket, MAX_CLIENTS) == 0) {
+        printf("Listening on port %d\n", PORT);
+    } else {
+        perror("Failed to listen on socket");
+        close(server_socket);
+        exit(EXIT_FAILURE);
+    }
 
-	// Array for threads
-	pthread_t tid[60];
-	int i = 0;
+    while (1) {
+        // Accept a new client connection
+        new_socket = accept(server_socket, (struct sockaddr*)&client_address, &client_len);
+        if (new_socket < 0) {
+            perror("Failed to accept connection");
+            continue;  // Skip to the next iteration
+        }
 
-	while (1) {
-		addr_size = sizeof(serverStorage);
+        // Allocate memory for client info structure
+        client_info* client = malloc(sizeof(client_info));
+        client->socket = new_socket;
+        client->address = client_address;
 
-		// Accept the incoming connection
-		newSocket = accept(serverSocket, (struct sockaddr*)&serverStorage, &addr_size);
+        // Create a new thread to handle the client
+        if (pthread_create(&thread_id, NULL, handle_client, (void*)client) != 0) {
+            perror("Failed to create thread");
+            close(new_socket);
+            free(client);
+            continue;  // Skip to the next iteration
+        }
 
-		if (newSocket < 0) {
-			printf("Error accepting connection\n");
-			continue;
-		}
+        // Detach the thread to allow it to clean up after itself
+        pthread_detach(thread_id);
+    }
 
-		// Acknowledge the client connection
-		printf("Client connection %d established.\n", i + 1);
-
-		int choice = 0;
-		recv(newSocket, &choice, sizeof(choice), 0);
-
-		if (choice == 1) {
-			// Create a reader thread
-			if (pthread_create(&readerthreads[i++], NULL, reader, &newSocket) != 0) {
-				// Error in creating thread
-				printf("Failed to create reader thread for client %d\n", i);
-			} else {
-				printf("Reader thread created for client %d\n", i);
-			}
-		}
-		else if (choice == 2) {
-			// Create a writer thread
-			if (pthread_create(&writerthreads[i++], NULL, writer, &newSocket) != 0) {
-				// Error in creating thread
-				printf("Failed to create writer thread for client %d\n", i);
-			} else {
-				printf("Writer thread created for client %d\n", i);
-			}
-		}
-
-		if (i >= 50) {
-			// Reset i
-			i = 0;
-
-			while (i < 50) {
-				// Suspend execution of the calling thread until the target thread terminates
-				pthread_join(writerthreads[i], NULL);
-				pthread_join(readerthreads[i], NULL);
-				i++;
-			}
-			// Reset i
-			i = 0;
-		}
-	}
-	return 0;
+    // Close the server socket (this line will not be reached in the current setup)
+    close(server_socket);
+    return 0;
 }
