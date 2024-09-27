@@ -1,36 +1,34 @@
-# Specify the compiler
+# flags
 CC = gcc
-
-# Compiler flags
 CFLAGS = -pthread
+CLIENT_SRC = multi_threaded_client.c
+SERVER_SRC = multi_threaded_server.c
+CLIENT_OUT = multi_threaded_client
+SERVER_OUT = multi_threaded_server
+PORT = 8989
+CLIENT_CPU_CORE ?= 1  # Default CPU core for client
+SERVER_CPU_CORE ?= 0  # Default CPU core for server
+NUM_CLIENTS ?= 1      # Default number of client threads
 
-# Target executable
-TARGET = multi_threaded_server
+# deafult - compile both server and client
+all: server client
 
-# Source file
-SRC = multi_threaded_server.c
+# compile server
+server: $(SERVER_SRC)
+	$(CC) $(CFLAGS) $(SERVER_SRC) -o $(SERVER_OUT)
 
-# Default rule
-all: $(TARGET)
+# compile client
+client: $(CLIENT_SRC)
+	$(CC) $(CFLAGS) $(CLIENT_SRC) -o $(CLIENT_OUT)
 
-# Rule to build the server
-$(TARGET): $(SRC)
-	$(CC) $(CFLAGS) $(SRC) -o $(TARGET)
-	@echo "Compilation complete!"
+# Rrun server
+run-server: server
+	taskset -c $(SERVER_CPU_CORE) ./$(SERVER_OUT)
 
-# Rule to run the server with taskset on a specified CPU
-run: $(TARGET)
-	@if [ -z "$(CPU)" ]; then \
-		echo "Usage: make run CPU=<cpu_number>"; \
-	else \
-		echo "Running the server on CPU $(CPU) with taskset..."; \
-		taskset -c $(CPU) ./$(TARGET); \
-	fi
+# run client
+run-client: client
+	taskset -c $(CLIENT_CPU_CORE) ./$(CLIENT_OUT) $(NUM_CLIENTS)
 
-# Clean up generated files
+# clean
 clean:
-	rm -f $(TARGET)
-	@echo "Cleaned up!"
-
-# Phony targets
-.PHONY: all clean run
+	rm -f $(SERVER_OUT) $(CLIENT_OUT)
