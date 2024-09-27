@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <time.h>
 
 #define PORT 8989
 #define BUFFER_SIZE 1024
@@ -12,10 +13,12 @@
 void* client_task(void* arg) {
     int sock = 0;
     struct sockaddr_in serv_addr;
-    const char *hello = "Hello from client";
     char buffer[BUFFER_SIZE] = {0};
-
+    char request[BUFFER_SIZE];
     pthread_t this_id = pthread_self();
+
+    // Create a unique request message for each thread
+    snprintf(request, sizeof(request), "Requesting top 2 CPU processes from thread %lu", (unsigned long)this_id);
 
     // Create socket
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -41,13 +44,16 @@ void* client_task(void* arg) {
         return NULL;
     }
 
-    // Send message to the server
-    send(sock, hello, strlen(hello), 0);
-    printf("Thread %lu: Hello message sent\n", (unsigned long)this_id);
+    // Introduce a random delay
+    usleep((rand() % 100) * 1000);  // Random delay between 0 to 100 ms
+
+    // Send request to the server
+    send(sock, request, strlen(request), 0);
+    printf("Thread %lu: Request sent\n", (unsigned long)this_id);
 
     // Read response from the server
     read(sock, buffer, BUFFER_SIZE);
-    printf("Thread %lu: Message received: %s\n", (unsigned long)this_id, buffer);
+    printf("Thread %lu: Server Response: %s\n", (unsigned long)this_id, buffer);
 
     // Close the socket
     close(sock);
