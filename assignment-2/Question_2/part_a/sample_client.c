@@ -9,10 +9,10 @@
 
 // Function to handle client tasks
 void client_task(int request_number) {
-    int sock = 0;
-    struct sockaddr_in serv_addr;
-    char buffer[BUFFER_SIZE] = {0};
-    char request[BUFFER_SIZE];
+    int sock = 0;                                 // Socket descriptor for the client
+    struct sockaddr_in serv_addr;                 // Structure to store server address
+    char buffer[BUFFER_SIZE] = {0};               // Buffer for storing the server's response
+    char request[BUFFER_SIZE];                    // Buffer for storing the request to be sent to the server
 
     // Create a unique request message for each client
     snprintf(request, sizeof(request), "Requesting top 2 CPU processes for request number %d", request_number);
@@ -58,12 +58,13 @@ void client_task(int request_number) {
 
 // Driver Code
 int main(int argc, char *argv[]) {
+    // Check if the correct number of arguments is passed
     if (argc != 2) {
-        fprintf(stderr, "Usage: %s <number_of_clients>\n", argv[0]);
-        return EXIT_FAILURE;
+        fprintf(stderr, "Usage: %s <number_of_clients>\n", argv[0]); // Error message for incorrect usage
+        return EXIT_FAILURE;  // Exit the program with a failure code if arguments are incorrect
     }
 
-    int num_clients = atoi(argv[1]);
+    int num_clients = atoi(argv[1]);  // Convert the number of clients from command line argument to an integer
 
     // Execute client tasks sequentially
     for (int i = 1; i <= num_clients; i++) {
