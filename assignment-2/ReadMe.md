@@ -1,6 +1,6 @@
 # ReadMe
 
-## Instructions for running the makefile of Question 1.
+## Instructions for running the makefile of Question 1
 
 
 ### Compile server node:
@@ -28,7 +28,7 @@ make run-client CPU_CORE=1,2 NUM_CLIENTS=2
 
 make run-client CPU_CORE=1-5 NUM_CLIENTS=5
 
-## Instruction for running the makefile of Question 2 (select).
+## Instruction for running the makefile of Question 2 (select)
 
 ### Compile both server and client node:
 make all
