@@ -31,10 +31,15 @@ make run-client CPU_CORE=1-5 NUM_CLIENTS=5
 ## Instruction for running the makefile of Question 2 (select)
 
 ### Compile both server and client node:
-make all
+gcc -o sample_server sample_server.c
+gcc -o sample_client sample_client.c
 
 ### Run the server node:
-make run_server CPU=<CPU_core>
+taskset -c <CPU_core> ./sample_server <Number_of_requests>
 
 ### Run the client node:
-make run_client CPU=<CPU_core> REQUESTS=<Number_of_requests>
+taskset -c <CPU_core> ./sample_client <Number_of_requests>
+
+Eg,
+taskset -c 0 ./sample_server 3
+taskset -c 1 ./sample_client 3
