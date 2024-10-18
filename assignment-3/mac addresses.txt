@@ -1,0 +1,55 @@
+Linux Mint (client): 0800275D5F0F
+password: rishit@2024
+
+code for 02-netcfg.yaml:-
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    enp0s8:
+      addresses: [20.1.1.1/24]
+      dhcp4: no
+      routes:
+      - to: default
+        via: 20.1.1.2
+
+gateway password: gw@2024
+
+network adapter 1: 080027FF35CB
+network adapter 2: 080027C6B10C
+
+code for 02-netcfg.yaml:-
+network:
+	version: 2
+	renderer: networkd
+	ethernets:
+		enp0s8:
+			addresses: [20.1.1.2/24]
+			dhcp4: no
+		enp0s9:
+			addresses: [40.1.1.2/24]
+			dhcp4: no
+
+server1 password: s1@2024
+MAC address: 0800277DB45C
+
+code for 02-netcfg.yaml:-
+network:
+	version: 2
+	renderer: networkd
+	ethernets:
+		enp0s8:
+			addresses: [40.1.1.1/24]
+			dhcp4: no
+
+server2 password: s2@2024
+MAC address: 080027BF4208
+
+code for 02-netcfg.yaml:-
+network:
+	version: 2
+	renderer: networkd
+	ethernets:
+		enp0s8:
+			addresses: [40.1.1.3/24]
+			dhcp4: no
